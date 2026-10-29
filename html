@@ -1,0 +1,88 @@
+using UnityEngine;
+using UnityEngine.UI;
+
+public class DeliveryManager : MonoBehaviour
+{
+    [Header("Cấu hình UI hiển thị")]
+    public Text missionStatusText;     // Chữ hiển thị trạng thái (Ví dụ: "Hãy đến điểm nhận hàng!")
+    public Text scoreText;             // Chữ hiển thị số đơn hàng đã giao thành công
+
+    [Header("Cấu hình Prefabs điểm đỗ")]
+    public GameObject pickupPointPrefab;  // Vòng sáng tròn màu xanh để nhận hàng
+    public GameObject deliveryPointPrefab;// Vòng sáng tròn màu đỏ để giao hàng
+
+    private bool hasPackage = false;       // Kiểm tra xem shipper đang cầm hàng hay không
+    private int completedDeliveries = 0;   // Số đơn hàng hoàn thành
+    private GameObject currentActivePoint; // Điểm kích hoạt hiện tại trên đường
+
+    void Start()
+    {
+        UpdateUI();
+        SpawnNextPoint(true); // Trò chơi bắt đầu: Tạo điểm nhận hàng đầu tiên
+    }
+
+    // Hàm tự động tạo điểm nhận hoặc điểm giao hàng ngẫu nhiên phía trước người chơi
+    public void SpawnNextPoint(bool isPickup)
+    {
+        // Xóa điểm cũ nếu có
+        if (currentActivePoint != null) Destroy(currentActivePoint);
+
+        // Tìm chiếc xe máy của người chơi
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player == null) return;
+
+        // Sinh điểm mới ngẫu nhiên phía trước xe máy từ 50 đến 150 mét trên trục Z
+        float spawnZ = player.transform.position.z + Random.Range(50f, 150f);
+        Vector3 spawnPosition = new Vector3(Random.Range(-4f, 4f), 0.5f, spawnZ); // Ngẫu nhiên làn đường trái/phải
+
+        // Lựa chọn Prefab tương ứng
+        GameObject prefabToSpawn = isPickup ? pickupPointPrefab : deliveryPointPrefab;
+        
+        // Tạo điểm đỗ trên bản đồ
+        currentActivePoint = Instantiate(prefabToSpawn, spawnPosition, Quaternion.identity);
+        
+        // Gắn script nhận diện va chạm vào điểm đỗ vừa tạo
+        DeliveryZone zoneScript = currentActivePoint.AddComponent<DeliveryZone>();
+        zoneScript.manager = this;
+        zoneScript.isPickupZone = isPickup;
+    }
+
+    // Hàm xử lý khi xe máy đi vào vùng kích hoạt
+    public void OnPlayerEnterZone(bool isPickupZone)
+    {
+        if (isPickupZone && !hasPackage)
+        {
+            // HÀNH ĐỘNG: NHẬN HÀNG THÀNH CÔNG
+            hasPackage = true;
+            Debug.Log("Đã nhận hàng! Hãy đi giao.");
+            SpawnNextPoint(false); // Sinh tiếp điểm GIAO HÀNG
+        }
+        else if (!isPickupZone && hasPackage)
+        {
+            // HÀNH ĐỘNG: GIAO HÀNG THÀNH CÔNG
+            hasPackage = false;
+            completedDeliveries++;
+            Debug.Log("Giao hàng thành công! +1 Điểm");
+            SpawnNextPoint(true);  // Sinh tiếp điểm NHẬN HÀNG cho đơn mới
+        }
+        
+        UpdateUI();
+    }
+
+    // Cập nhật chữ hiển thị lên giao diện game
+    void UpdateUI()
+    {
+        if (scoreText != null)
+        {
+            scoreText.text = "Đơn hàng: " + completedDeliveries;
+        }
+
+        if (missionStatusText != null)
+        {
+            if (!hasPackage)
+                missionStatusText.text = "📍 Hãy đến ĐIỂM XANH nhận hàng!";
+            else
+                missionStatusText.text = "🏁 Hãy đến ĐIỂM ĐỎ giao hàng gấp!";
+        }
+    }
+}
