@@ -1,0 +1,75 @@
+using UnityEngine;
+
+public class MotorbikeController : MonoBehaviour
+{
+    [Header("Cài đặt di chuyển")]
+    public float moveSpeed = 15f;       // Tốc độ di chuyển về phía trước (km/h tương ứng)
+    public float turnSpeed = 45f;       // Tốc độ rẽ trái/phải
+    public float brakeForce = 30f;      // Lực phanh xe
+    
+    [Header("Thành phần kết nối")]
+    public Rigidbody rb;
+    
+    private float currentSpeed = 0f;
+    private bool isBraking = false;
+    private float turnInput = 0f;
+
+    void Start()
+    {
+        // Tự động lấy Rigidbody nếu chưa kéo thả vào Inspector
+        if (rb == null) rb = GetComponent<Rigidbody>();
+        
+        // Khóa xoay Rigidbody để xe không bị lật ngã tự do do vật lý
+        rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+    }
+
+    void Update()
+    {
+        // 1. Nhận lệnh điều khiển từ bàn phím (Hoặc từ các nút bấm UI trên điện thoại)
+        if (!isBraking)
+        {
+            // Xe tự động chạy về phía trước, hoặc nhấn Mũi tên lên / W để tăng tốc
+            currentSpeed = Mathf.MoveTowards(currentSpeed, moveSpeed, Time.deltaTime * 10f);
+        }
+        else
+        {
+            // Khi phanh, tốc độ giảm nhanh về 0
+            currentSpeed = Mathf.MoveTowards(currentSpeed, 0f, Time.deltaTime * brakeForce);
+        }
+
+        // Nhận lệnh rẽ (Mũi tên Trái/Phải hoặc phím A/D)
+        turnInput = Input.GetAxis("Horizontal");
+    }
+
+    void FixedUpdate()
+    {
+        // 2. Xử lý di chuyển vật lý trong FixedUpdate để mượt mà hơn
+        
+        // Di chuyển xe về phía trước theo hướng của đầu xe
+        Vector3 forwardMovement = transform.forward * currentSpeed * Time.fixedDeltaTime;
+        rb.MovePosition(rb.position + forwardMovement);
+
+        // Xoay đầu xe sang trái hoặc phải
+        float turnAmount = turnInput * turnSpeed * Time.fixedDeltaTime;
+        Quaternion turnRotation = Quaternion.Euler(0f, turnAmount, 0f);
+        rb.MoveRotation(rb.rotation * turnRotation);
+    }
+
+    // 3. Các hàm Public dùng để liên kết với Nút Bấm UI (Ví dụ: Nút Phanh trên màn hình)
+    public void PointerDownBrake()
+    {
+        isBraking = true;
+    }
+
+    public void PointerUpBrake()
+    {
+        isBraking = false;
+    }
+
+    // Hàm trả về tốc độ hiện tại để hiển thị lên đồng hồ HUD (Màn hình 000 km/h)
+    public float GetCurrentSpeed()
+    {
+        // Nhân hệ số để hiển thị số km/h ảo cho giống thực tế
+        return Mathf.Round(currentSpeed * 3.6f); 
+    }
+}
