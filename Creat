@@ -1,0 +1,16 @@
+using UnityEngine;
+
+public class DeliveryZone : MonoBehaviour
+{
+    public DeliveryManager manager;
+    public bool isPickupZone;
+
+    private void OnTriggerEnter(Collider other)
+    {
+        // Kiểm tra xem vật thể đâm vào vòng sáng có phải là chiếc xe máy (Player) không
+        if (other.CompareTag("Player"))
+        {
+            manager.OnPlayerEnterZone(isPickupZone);
+        }
+    }
+}
