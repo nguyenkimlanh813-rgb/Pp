@@ -1,0 +1,151 @@
+using UnityEngine;
+using UnityEngine.UI;
+
+public class DeliveryManagerPro : MonoBehaviour
+{
+    [Header("Cấu hình UI")]
+    public Text missionStatusText;     // Chữ hiển thị trạng thái nhiệm vụ
+    public Text scoreText;             // Chữ hiển thị số đơn hàng
+    public Text timerText;             // Chữ hiển thị thời gian còn lại
+    public Text cashText;              // Chữ hiển thị số tiền thưởng ($)
+
+    [Header("Cấu hình Nhiệm vụ")]
+    public GameObject pickupPointPrefab;  
+    public GameObject deliveryPointPrefab;
+    public Transform deliveryArrow;       // Kéo thả GameObject Mũi tên chỉ hướng vào đây
+    public float timePerDelivery = 30f;   // Thời gian giới hạn cho mỗi đơn (giây)
+
+    [Header("Cấu hình Thưởng")]
+    public int cashRewardPerOrder = 50;   // Số tiền nhận được mỗi đơn thành công
+
+    private bool hasPackage = false;       
+    private int completedDeliveries = 0;   
+    private int totalCash = 0;
+    private float timeRemaining;
+    private bool isGameActive = true;
+    private GameObject currentActivePoint; 
+    private Transform playerTransform;
+
+    void Start()
+    {
+        // Tìm xe máy của người chơi qua thẻ Tag
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null) playerTransform = player.transform;
+
+        timeRemaining = timePerDelivery;
+        UpdateUI();
+        SpawnNextPoint(true); 
+    }
+
+    void Update()
+    {
+        if (!isGameActive) return;
+
+        // 1. Xử lý đếm ngược thời gian
+        if (timeRemaining > 0)
+        {
+            timeRemaining -= Time.deltaTime;
+            UpdateTimerUI();
+        }
+        else
+        {
+            GameOver();
+        }
+
+        // 2. Xử lý Mũi tên chỉ hướng xoay về phía Điểm Nhận/Giao hàng
+        if (currentActivePoint != null && deliveryArrow != null && playerTransform != null)
+        {
+            // Đặt vị trí mũi tên đi theo xe máy (lơ lửng trên đầu xe)
+            deliveryArrow.position = playerTransform.position + new Vector3(0f, 2.5f, 1f);
+            
+            // Xoay mũi tên hướng thẳng về phía điểm đỗ mục tiêu
+            Vector3 direction = currentActivePoint.transform.position - deliveryArrow.position;
+            direction.y = 0; // Giữ mũi tên nằm ngang, không bị chúc đầu xuống đất
+            
+            if (direction != Vector3.zero)
+            {
+                deliveryArrow.rotation = Quaternion.LookRotation(direction);
+            }
+        }
+    }
+
+    public void SpawnNextPoint(bool isPickup)
+    {
+        if (currentActivePoint != null) Destroy(currentActivePoint);
+        if (playerTransform == null) return;
+
+        // Tạo điểm đỗ ngẫu nhiên phía trước xe từ 60 đến 120 mét
+        float spawnZ = playerTransform.position.z + Random.Range(60f, 120f);
+        Vector3 spawnPosition = new Vector3(Random.Range(-4f, 4f), 0.5f, spawnZ); 
+
+        GameObject prefabToSpawn = isPickup ? pickupPointPrefab : deliveryPointPrefab;
+        currentActivePoint = Instantiate(prefabToSpawn, spawnPosition, Quaternion.identity);
+        
+        // Gắn cơ chế va chạm
+        DeliveryZonePro zoneScript = currentActivePoint.AddComponent<DeliveryZonePro>();
+        zoneScript.manager = this;
+        zoneScript.isPickupZone = isPickup;
+
+        // Bật mũi tên hiển thị khi có mục tiêu mới
+        if (deliveryArrow != null) deliveryArrow.gameObject.SetActive(true);
+    }
+
+    public void OnPlayerEnterZone(bool isPickupZone)
+    {
+        if (!isGameActive) return;
+
+        if (isPickupZone && !hasPackage)
+        {
+            hasPackage = true;
+            // Reset lại thời gian mới để đi giao hàng
+            timeRemaining = timePerDelivery; 
+            SpawnNextPoint(false); 
+        }
+        else if (!isPickupZone && hasPackage)
+        {
+            hasPackage = false;
+            completedDeliveries++;
+            
+            // Cộng tiền thưởng
+            totalCash += cashRewardPerOrder;
+            
+            // Reset lại thời gian mới để đi nhận đơn tiếp theo
+            timeRemaining = timePerDelivery; 
+            SpawnNextPoint(true);  
+        }
+        
+        UpdateUI();
+    }
+
+    void UpdateUI()
+    {
+        if (scoreText != null) scoreText.text = "Đơn hàng: " + completedDeliveries;
+        if (cashText != null) cashText.text = "Tiền: $" + totalCash;
+        
+        if (missionStatusText != null)
+        {
+            missionStatusText.text = !hasPackage ? "📍 Hãy đến ĐIỂM XANH nhận hàng!" : "🏁 Hãy đến ĐIỂM ĐỎ giao hàng!";
+        }
+    }
+
+    void UpdateTimerUI()
+    {
+        if (timerText != null)
+        {
+            // Hiển thị dạng số nguyên giây (Ví dụ: "Thời gian: 24s")
+            timerText.text = "Thời gian: " + Mathf.CeilToInt(timeRemaining) + "s";
+            
+            // Đổi chữ sang màu đỏ nếu thời gian sắp hết (dưới 7 giây) để cảnh báo giống ảnh mẫu
+            timerText.color = (timeRemaining < 7f) ? Color.red : Color.white;
+        }
+    }
+
+    void GameOver()
+    {
+        isGameActive = false;
+        if (missionStatusText != null) missionStatusText.text = "💥 HẾT GIỜ! BẠN ĐÃ BỊ BOM HÀNG.";
+        if (deliveryArrow != null) deliveryArrow.gameObject.SetActive(false);
+        if (currentActivePoint != null) Destroy(currentActivePoint);
+        Debug.Log("Game Over!");
+    }
+}
