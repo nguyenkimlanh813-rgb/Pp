@@ -1,0 +1,73 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+public class TrafficSpawner : MonoBehaviour
+{
+    [Header("Cấu hình xe giao thông")]
+    public List<GameObject> trafficPrefabs; // Danh sách các loại xe (xe tải, xe con, xe máy khác)
+    public Transform playerTransform;       // Vị trí người chơi để tính toán khoảng cách sinh xe
+    
+    public float spawnDistance = 100f;      // Sinh xe cách người chơi bao nhiêu mét về phía trước
+    public float spawnRate = 3f;            // Cứ sau bao nhiêu giây thì sinh 1 xe mới
+    public float minVehicleSpeed = 5f;      // Tốc độ tối thiểu của xe giao thông
+    public float maxVehicleSpeed = 12f;     // Tốc độ tối đa của xe giao thông
+
+    private float spawnTimer;
+    // Tọa độ các làn đường (Ví dụ đường rộng có 3 làn: trái, giữa, phải)
+    private float[] lanes = new float[] { -3.5f, 0f, 3.5f }; 
+
+    void Start()
+    {
+        if (playerTransform == null)
+            playerTransform = GameObject.FindGameObjectWithTag("Player").transform;
+    }
+
+    void Update()
+    {
+        spawnTimer += Time.deltaTime;
+        if (spawnTimer >= spawnRate)
+        {
+            SpawnVehicle();
+            spawnTimer = 0f;
+        }
+    }
+
+    void SpawnVehicle()
+    {
+        if (trafficPrefabs.Count == 0 || playerTransform == null) return;
+
+        // Chọn ngẫu nhiên loại xe và làn đường
+        GameObject randomVehicle = trafficPrefabs[Random.Range(0, trafficPrefabs.Count)];
+        float randomLane = lanes[Random.Range(0, lanes.Length)];
+
+        // Tính toán vị trí xuất hiện ở phía trước người chơi trên trục Z
+        Vector3 spawnPos = new Vector3(randomLane, 0.5f, playerTransform.position.z + spawnDistance);
+
+        // Tạo xe giao thông
+        GameObject vehicle = Instantiate(randomVehicle, spawnPos, Quaternion.Euler(0, 180, 0)); // Xoay 180 độ để chạy ngược chiều
+
+        // Gắn thành phần di chuyển cho xe giao thông
+        AIConstraint movement = vehicle.AddComponent<AIConstraint>();
+        movement.speed = Random.Range(minVehicleSpeed, maxVehicleSpeed);
+        movement.playerTrans = playerTransform;
+    }
+}
+
+// Lớp phụ điều khiển xe giao thông tự chạy và tự hủy khi bị bỏ lại phía sau
+public class AIConstraint : MonoBehaviour
+{
+    public float speed;
+    public Transform playerTrans;
+
+    void Update()
+    {
+        // Xe chạy ngược chiều về phía người chơi (trục Z âm)
+        transform.Translate(Vector3.forward * speed * Time.deltaTime);
+
+        // Nếu xe giao thông đã chạy qua phía sau lưng người chơi quá 30m thì hủy để nhẹ máy
+        if (playerTrans != null && transform.position.z < playerTrans.position.z - 30f)
+        {
+            Destroy(gameObject);
+        }
+    }
+}
