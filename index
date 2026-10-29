@@ -1,0 +1,56 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+public class StreetGenerator : MonoBehaviour
+{
+    [Header("Cài đặt Khung cảnh")]
+    public List<GameObject> streetPrefabs;    // Danh sách các đoạn đường mẫu (mỗi đoạn gồm đường, nhà cửa, vỉa hè)
+    public Transform playerTransform;         // Vị trí của xe máy (Player)
+    
+    public float blockLength = 50f;           // Chiều dài của mỗi đoạn đường mẫu (tính bằng mét)
+    public int maxBlocksOnScreen = 5;         // Số lượng đoạn đường tối đa xuất hiện cùng lúc trên màn hình
+    public float safeZone = 60f;              // Khoảng cách an toàn để xóa đoạn đường phía sau
+
+    private List<GameObject> activeBlocks = new List<GameObject>();
+    private float spawnZ = 0f;                // Tọa độ trục Z tiếp theo để sinh đường
+
+    void Start()
+    {
+        // Sinh trước các đoạn đường ban đầu khi vừa vào game
+        for (int i = 0; i < maxBlocksOnScreen; i++)
+        {
+            // Đoạn đường đầu tiên (i=0) nên là đoạn đường thẳng, trống trải để người chơi bắt đầu
+            if (i == 0)
+                SpawnBlock(0); 
+            else
+                SpawnBlock(Random.Range(0, streetPrefabs.Count));
+        }
+    }
+
+    void Update()
+    {
+        // Kiểm tra nếu xe máy đã đi qua đoạn đường cũ, tiến hành sinh đoạn mới và xóa đoạn cũ
+        if (playerTransform.position.z - safeZone > (spawnZ - maxBlocksOnScreen * blockLength))
+        {
+            SpawnBlock(Random.Range(0, streetPrefabs.Count));
+            DeleteOldBlock();
+        }
+    }
+
+    // Hàm tạo đoạn đường mới phía trước
+    void SpawnBlock(int prefabIndex)
+    {
+        if (streetPrefabs.Count == 0) return;
+
+        GameObject block = Instantiate(streetPrefabs[prefabIndex], transform.forward * spawnZ, Quaternion.identity);
+        activeBlocks.Add(block);
+        spawnZ += blockLength; // Tăng tọa độ Z lên để đoạn sau nối tiếp đoạn trước
+    }
+
+    // Hàm xóa đoạn đường cũ phía sau lưng người chơi để tiết kiệm RAM/Bộ nhớ
+    void DeleteOldBlock()
+    {
+        Destroy(activeBlocks[0]);
+        activeBlocks.RemoveAt(0);
+    }
+}
